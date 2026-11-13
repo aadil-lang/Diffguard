@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 243, 244, 246;
+  --background-start-rgb: 10, 15, 29;
+  --background-end-rgb: 4, 7, 18;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: radial-gradient(circle at 50% 0%, #151e36 0%, #080c17 75%, #040712 100%);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1322;
+}
+::-webkit-scrollbar-thumb {
+  background: #253352;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #384b73;
+}
+
+/* Diff formatting helpers */
+.diff-added {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+.diff-deleted {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+.diff-hunk-header {
+  background-color: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
