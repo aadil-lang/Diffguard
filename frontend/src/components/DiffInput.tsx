@@ -1,8 +1,43 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Play, Sparkles, UploadCloud, FileCode2, ChevronDown, ChevronUp, Trash2, CheckCircle2 } from 'lucide-react';
+import { Play, Sparkles, UploadCloud, FileCode2, ChevronDown, ChevronUp, Trash2, CheckCircle2, ShieldCheck, FileCheck, Sliders } from 'lucide-react';
 import { SampleDiff } from '@/types';
+
+const SAMPLE_STANDARDS_YAML = `version: 1
+project:
+  name: sample-repository
+standards:
+  code_quality:
+    max_function_length:
+      enabled: true
+      value: 50
+      severity: medium
+    max_nesting_depth:
+      enabled: true
+      value: 4
+      severity: medium
+  security:
+    prohibited_imports:
+      enabled: true
+      values:
+        - pickle
+        - telnetlib
+      severity: high
+    custom_patterns:
+      enabled: true
+      rules:
+        - id: SEC-RAW-SQL
+          name: Raw SQL Query Pattern
+          pattern: 'execute.*SELECT.*%'
+          severity: high
+          description: Avoid raw SQL string formatting; use parameterized queries
+  testing:
+    require_test_changes:
+      enabled: true
+      severity: medium
+      min_additions_threshold: 8
+`;
 
 interface DiffInputProps {
   diffContent: string;
@@ -11,6 +46,8 @@ interface DiffInputProps {
   setPrTitle: (val: string) => void;
   customInstructions: string;
   setCustomInstructions: (val: string) => void;
+  standardsYaml?: string;
+  setStandardsYaml?: (val: string) => void;
   samples: SampleDiff[];
   isLoading: boolean;
   onStartReview: () => void;
@@ -23,11 +60,14 @@ export const DiffInput: React.FC<DiffInputProps> = ({
   setPrTitle,
   customInstructions,
   setCustomInstructions,
+  standardsYaml = '',
+  setStandardsYaml,
   samples,
   isLoading,
   onStartReview,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showStandards, setShowStandards] = useState(false);
   const [selectedSampleId, setSelectedSampleId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +206,78 @@ export const DiffInput: React.FC<DiffInputProps> = ({
         </div>
       </div>
 
+      {/* Engineering Standards Policy (.diffguard.yaml) Accordion */}
+      <div className="mt-3 border border-gray-800/80 rounded-xl bg-gray-950/40 p-3">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowStandards(!showStandards)}
+            className="flex items-center space-x-2 text-xs font-medium text-gray-300 hover:text-white transition-colors"
+          >
+            {showStandards ? <ChevronUp className="w-3.5 h-3.5 text-indigo-400" /> : <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />}
+            <Sliders className="w-3.5 h-3.5 text-purple-400" />
+            <span>Engineering Standards Policy (.diffguard.yaml)</span>
+          </button>
+
+          <div className="flex items-center space-x-2">
+            {standardsYaml && standardsYaml.trim() ? (
+              <span className="text-[10px] font-mono text-purple-300 bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                <CheckCircle2 className="w-2.5 h-2.5 text-purple-400" />
+                <span>Custom Policy ({standardsYaml.split('\n').length} lines)</span>
+              </span>
+            ) : (
+              <span className="text-[10px] text-gray-500 font-mono">
+                Default Policies Active
+              </span>
+            )}
+          </div>
+        </div>
+
+        {showStandards && (
+          <div className="mt-3 space-y-2">
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Define deterministic repository policies for function length, nesting depth, prohibited imports, custom regex patterns, and test requirements.
+            </p>
+            <div className="relative">
+              <textarea
+                value={standardsYaml}
+                onChange={(e) => setStandardsYaml?.(e.target.value)}
+                placeholder="Paste .diffguard.yaml content or load sample..."
+                rows={8}
+                disabled={isLoading}
+                className="w-full text-xs font-mono bg-gray-950 border border-gray-800 rounded-lg p-3 text-purple-200 placeholder-gray-600 focus:outline-none focus:border-purple-500 leading-relaxed"
+                spellCheck={false}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <span className="text-[10px] text-gray-500">
+                Safe YAML parser (strict Pydantic schema validation, 64KB max)
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setStandardsYaml?.(SAMPLE_STANDARDS_YAML)}
+                  disabled={isLoading}
+                  className="text-xs text-purple-300 hover:text-purple-200 bg-purple-950/40 border border-purple-800/50 px-2.5 py-1 rounded-md transition-colors"
+                >
+                  Load Sample Policy
+                </button>
+                {standardsYaml && (
+                  <button
+                    type="button"
+                    onClick={() => setStandardsYaml?.('')}
+                    disabled={isLoading}
+                    className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Advanced Guideline Accordion */}
       <div className="mt-3">
         <button
@@ -218,3 +330,4 @@ export const DiffInput: React.FC<DiffInputProps> = ({
     </div>
   );
 };
+

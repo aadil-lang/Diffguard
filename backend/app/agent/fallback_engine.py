@@ -4,12 +4,14 @@ in offline environments, when Gemini API key is unconfigured, or during upstream
 """
 
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.models.schemas import (
     Finding,
     FindingCategory,
     SeverityLevel,
     FindingConfidence,
+    FindingType,
+    PolicyEvaluationStatus,
     CodeLocation,
     SuggestedFix,
     ReviewSummary,
@@ -18,15 +20,19 @@ from app.models.schemas import (
     StageStatus
 )
 from app.models.diff_models import ParsedDiff
+from app.parser.location_validator import validate_all_findings, normalize_repo_path
+from app.tools.security_scanner import redact_sensitive_line
 
 
 def run_heuristic_code_review(
     parsed_diff: ParsedDiff,
     tool_results: Dict[str, Any],
-    stages: List[ProcessingStage]
+    stages: List[ProcessingStage],
+    policy_findings: Optional[List[Finding]] = None
 ) -> ReviewResponse:
     """
-    Synthesize structured findings from empirical tool evidence and heuristic static analysis.
+    Synthesize structured findings from empirical tool evidence, heuristic static analysis,
+    and deterministic engineering standards evaluation.
     """
     findings: List[Finding] = []
     finding_counter = 1
@@ -83,7 +89,7 @@ def run_heuristic_code_review(
                 location=CodeLocation(
                     file_path=syn.get("file_path", "unknown"),
                     start_line=syn.get("adjusted_line", syn.get("line_number", 1)),
-                    code_context=syn.get("text", "")
+                    code_context=redact_sensitive_line(syn.get("text", "")) if syn.get("text") else None
                 ),
                 why_identified=syn.get("message", "Syntax or linter violation identified in added code."),
                 impact="May lead to runtime exceptions, race conditions, or unhandled errors in production.",
@@ -210,15 +216,56 @@ def run_heuristic_code_review(
                         )
                     )
 
+    # 6. Merge deterministic policy findings from Engineering Standards Engine
+    if policy_findings:
+        findings.extend(policy_findings)
+
+    # Deduplicate findings across multiple tools/heuristics/policies using canonical paths and diff-side identity
+    seen_keys = set()
+    deduped_findings: List[Finding] = []
+    for f in findings:
+        norm_path = normalize_repo_path(f.location.file_path) if f.location else ""
+        side_val = f.location.line_side.value if (f.location and f.location.line_side) else None
+        f_key = (norm_path, f.location.start_line if f.location else 0, side_val, f.category.value, f.title, getattr(f, "rule_id", None))
+        if f_key not in seen_keys:
+            seen_keys.add(f_key)
+            deduped_findings.append(f)
+    findings = deduped_findings
+
+    # Validate location integrity against parsed diff
+    findings = validate_all_findings(findings, parsed_diff)
+
+    # Centralized disclosure-safe sanitization of all output evidence fields
+    for f in findings:
+        if f.location and f.location.code_context:
+            f.location.code_context = redact_sensitive_line(f.location.code_context)
+        if f.why_identified:
+            f.why_identified = redact_sensitive_line(f.why_identified)
+
     # Build Summary
     by_sev: Dict[str, int] = {s.value: 0 for s in SeverityLevel}
     by_cat: Dict[str, int] = {c.value: 0 for c in FindingCategory}
     by_conf: Dict[str, int] = {cf.value: 0 for cf in FindingConfidence}
+    by_type: Dict[str, int] = {t.value: 0 for t in FindingType}
+
+    total_defects = 0
+    total_policy_violations = 0
+    total_recommendations = 0
 
     for f in findings:
         by_sev[f.severity.value] = by_sev.get(f.severity.value, 0) + 1
         by_cat[f.category.value] = by_cat.get(f.category.value, 0) + 1
         by_conf[f.confidence.value] = by_conf.get(f.confidence.value, 0) + 1
+        
+        ftype = f.finding_type or FindingType.CODE_DEFECT
+        by_type[ftype.value] = by_type.get(ftype.value, 0) + 1
+
+        if ftype == FindingType.POLICY_VIOLATION:
+            total_policy_violations += 1
+        elif ftype == FindingType.RECOMMENDATION:
+            total_recommendations += 1
+        else:
+            total_defects += 1
 
     # Determine overall verdict
     if by_sev.get("CRITICAL", 0) > 0:
@@ -231,10 +278,12 @@ def run_heuristic_code_review(
         verdict = "APPROVED"
 
     key_takeaways = []
-    if by_sev.get("CRITICAL", 0) > 0:
-        key_takeaways.append(f"Blocked by {by_sev['CRITICAL']} Critical issue(s) that must be remediated immediately.")
-    if by_sev.get("HIGH", 0) > 0:
-        key_takeaways.append(f"Identified {by_sev['HIGH']} High severity risk(s) requiring revision.")
+    if total_defects > 0 and by_sev.get("CRITICAL", 0) > 0:
+        key_takeaways.append(f"Blocked by {by_sev['CRITICAL']} Critical defect(s) that must be remediated.")
+    if total_policy_violations > 0:
+        key_takeaways.append(f"Contains {total_policy_violations} engineering policy violation(s) (.diffguard.yaml).")
+    if by_sev.get("HIGH", 0) > 0 and by_sev.get("CRITICAL", 0) == 0:
+        key_takeaways.append(f"Identified {by_sev['HIGH']} High severity finding(s) requiring revision.")
     if by_cat.get("MISSING_TEST_COVERAGE", 0) > 0:
         key_takeaways.append("Test coverage is missing for newly added business logic paths.")
     if not findings:
@@ -242,6 +291,10 @@ def run_heuristic_code_review(
 
     summary = ReviewSummary(
         total_findings=len(findings),
+        total_defects=total_defects,
+        total_policy_violations=total_policy_violations,
+        total_recommendations=total_recommendations,
+        by_finding_type=by_type,
         by_severity=by_sev,
         by_category=by_cat,
         by_confidence=by_conf,

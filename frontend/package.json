@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --test src/tests/diff_viewer_logic.test.mjs src/tests/standards_filtering_logic.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -26,3 +27,4 @@
     "typescript": "^5.7.2"
   }
 }
+

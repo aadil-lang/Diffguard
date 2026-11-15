@@ -12,11 +12,19 @@ export type FindingConfidence =
   | 'POTENTIAL_ISSUE'
   | 'IMPROVEMENT_SUGGESTION';
 
+export type FindingType = 'code_defect' | 'policy_violation' | 'recommendation';
+
+export type PolicyEvaluationStatus = 'violated' | 'passed' | 'not_evaluated';
+
 export type ReviewVerdict =
   | 'APPROVED'
   | 'APPROVED_WITH_COMMENTS'
   | 'CHANGES_REQUESTED'
   | 'CRITICAL_BLOCKER';
+
+export type LocationStatus = 'verified' | 'unverified' | 'invalid' | 'file_level';
+
+export type LineSide = 'new' | 'old' | 'both' | 'file_level';
 
 export interface CodeLocation {
   file_path: string;
@@ -24,6 +32,9 @@ export interface CodeLocation {
   end_line?: number | null;
   hunk_header?: string | null;
   code_context?: string | null;
+  line_side?: LineSide | null;
+  location_status?: LocationStatus;
+  validation_note?: string | null;
 }
 
 export interface SuggestedFix {
@@ -43,10 +54,19 @@ export interface Finding {
   impact: string;
   suggested_fix?: SuggestedFix | null;
   tool_evidence: string[];
+  finding_type?: FindingType;
+  rule_id?: string | null;
+  rule_name?: string | null;
+  policy_category?: string | null;
+  policy_evaluation_status?: PolicyEvaluationStatus | null;
 }
 
 export interface ReviewSummary {
   total_findings: number;
+  total_defects?: number;
+  total_policy_violations?: number;
+  total_recommendations?: number;
+  by_finding_type?: Record<string, number>;
   by_severity: Record<string, number>;
   by_category: Record<string, number>;
   by_confidence: Record<string, number>;
@@ -68,6 +88,7 @@ export interface ReviewRequest {
   diff_content: string;
   title?: string | null;
   custom_instructions?: string | null;
+  standards_yaml?: string | null;
   api_key?: string | null;
   model_name?: string | null;
 }
@@ -92,3 +113,4 @@ export interface SampleDiff {
   expected_severity: SeverityLevel;
   diff_content: string;
 }
+

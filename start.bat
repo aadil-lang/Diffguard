@@ -9,3 +9,4 @@ start "DiffGuard Backend" cmd /k "cd backend && python -m uvicorn app.main:app -
 echo [2/2] Launching Next.js Frontend on port 3000...
 cd frontend
 npm run dev
+

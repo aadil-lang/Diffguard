@@ -30,12 +30,41 @@ class FindingConfidence(str, Enum):
     IMPROVEMENT_SUGGESTION = "IMPROVEMENT_SUGGESTION"
 
 
+class FindingType(str, Enum):
+    CODE_DEFECT = "code_defect"
+    POLICY_VIOLATION = "policy_violation"
+    RECOMMENDATION = "recommendation"
+
+
+class PolicyEvaluationStatus(str, Enum):
+    VIOLATED = "violated"
+    PASSED = "passed"
+    NOT_EVALUATED = "not_evaluated"
+
+
+class LocationStatus(str, Enum):
+    VERIFIED = "verified"
+    UNVERIFIED = "unverified"
+    INVALID = "invalid"
+    FILE_LEVEL = "file_level"
+
+
+class LineSide(str, Enum):
+    NEW = "new"
+    OLD = "old"
+    BOTH = "both"
+    FILE_LEVEL = "file_level"
+
+
 class CodeLocation(BaseModel):
     file_path: str = Field(..., description="Target file path relative to repo root")
-    start_line: int = Field(..., description="Line number where issue begins in new code")
-    end_line: Optional[int] = Field(None, description="Line number where issue ends in new code")
+    start_line: int = Field(..., description="Line number where issue begins")
+    end_line: Optional[int] = Field(None, description="Line number where issue ends")
     hunk_header: Optional[str] = Field(None, description="Hunk header context (e.g. @@ -12,4 +12,6 @@)")
     code_context: Optional[str] = Field(None, description="Contextual snippet of affected diff lines")
+    line_side: Optional[LineSide] = Field(LineSide.NEW, description="Side of diff: 'new' (added), 'old' (deleted), 'both' (context), or 'file_level'")
+    location_status: LocationStatus = Field(LocationStatus.UNVERIFIED, description="Location validity: verified, unverified, invalid, or file_level")
+    validation_note: Optional[str] = Field(None, description="Explanation of location verification status")
 
 
 class SuggestedFix(BaseModel):
@@ -55,6 +84,11 @@ class Finding(BaseModel):
     impact: str = Field(..., description="Potential consequence or operational failure risk")
     suggested_fix: Optional[SuggestedFix] = Field(None, description="Actionable proposed fix")
     tool_evidence: List[str] = Field(default_factory=list, description="Empirical evidence from tool checks")
+    finding_type: FindingType = Field(default=FindingType.CODE_DEFECT, description="Classification of finding: 'code_defect', 'policy_violation', or 'recommendation'")
+    rule_id: Optional[str] = Field(None, description="Identifier of the engineering standard rule (e.g. POLICY-SEC-001, STD-LEN-001)")
+    rule_name: Optional[str] = Field(None, description="Human-readable rule name")
+    policy_category: Optional[str] = Field(None, description="Configured policy group: code_quality, security, testing, style")
+    policy_evaluation_status: Optional[PolicyEvaluationStatus] = Field(None, description="Status of policy evaluation: 'violated', 'passed', 'not_evaluated'")
 
 
 ReviewVerdict = Literal["APPROVED", "APPROVED_WITH_COMMENTS", "CHANGES_REQUESTED", "CRITICAL_BLOCKER"]
@@ -62,6 +96,10 @@ ReviewVerdict = Literal["APPROVED", "APPROVED_WITH_COMMENTS", "CHANGES_REQUESTED
 
 class ReviewSummary(BaseModel):
     total_findings: int = 0
+    total_defects: int = 0
+    total_policy_violations: int = 0
+    total_recommendations: int = 0
+    by_finding_type: Dict[str, int] = Field(default_factory=dict)
     by_severity: Dict[str, int] = Field(default_factory=dict)
     by_category: Dict[str, int] = Field(default_factory=dict)
     by_confidence: Dict[str, int] = Field(default_factory=dict)
@@ -89,6 +127,7 @@ class ReviewRequest(BaseModel):
     diff_content: str = Field(..., min_length=5, description="Unified git diff or patch text")
     title: Optional[str] = Field(None, description="Optional title or PR name")
     custom_instructions: Optional[str] = Field(None, description="Optional custom review guidelines")
+    standards_yaml: Optional[str] = Field(None, description="Optional raw YAML string conforming to .diffguard.yaml schema")
     api_key: Optional[str] = Field(None, description="Optional custom Gemini API key for this request")
     model_name: Optional[str] = Field(None, description="Optional model override")
 

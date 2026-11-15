@@ -17,6 +17,7 @@ export default function Home() {
   const [diffContent, setDiffContent] = useState<string>('');
   const [prTitle, setPrTitle] = useState<string>('');
   const [customInstructions, setCustomInstructions] = useState<string>('');
+  const [standardsYaml, setStandardsYaml] = useState<string>('');
   const [samples, setSamples] = useState<SampleDiff[]>([]);
   const [stages, setStages] = useState<ProcessingStage[]>([]);
   const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
@@ -25,19 +26,21 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'findings' | 'diff'>('findings');
   const [highlightFile, setHighlightFile] = useState<string | null>(null);
   const [highlightLine, setHighlightLine] = useState<number | null>(null);
+  const [highlightSide, setHighlightSide] = useState<string | null>(null);
 
-  // Settings state
+  // Settings state (apiKey is strictly kept in-memory for session security)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [useStreaming, setUseStreaming] = useState(true);
 
-  // Load samples and settings on mount
+  // Load samples and UI preferences on mount
   useEffect(() => {
-    const savedKey = localStorage.getItem('diffguard_api_key') || '';
-    const savedModel = localStorage.getItem('diffguard_model') || 'gemini-2.5-flash';
+    // Purge any legacy API key from localStorage
+    localStorage.removeItem('diffguard_api_key');
+
+    const savedModel = localStorage.getItem('diffguard_model') || 'gemini-3.8-flash';
     const savedStream = localStorage.getItem('diffguard_stream') !== 'false';
-    setApiKey(savedKey);
     setSelectedModel(savedModel);
     setUseStreaming(savedStream);
 
@@ -60,9 +63,10 @@ export default function Home() {
       });
   }, []);
 
-  const handleNavigateToFile = (file: string, line: number) => {
+  const handleNavigateToFile = (file: string, line: number, lineSide?: string) => {
     setHighlightFile(file);
     setHighlightLine(line);
+    setHighlightSide(lineSide || 'new');
     setActiveTab('diff');
   };
 
@@ -87,6 +91,7 @@ export default function Home() {
       diff_content: diffContent,
       title: prTitle || undefined,
       custom_instructions: customInstructions || undefined,
+      standards_yaml: standardsYaml.trim() ? standardsYaml : undefined,
       api_key: apiKey || undefined,
       model_name: selectedModel || undefined,
     };
@@ -212,6 +217,8 @@ export default function Home() {
           setPrTitle={setPrTitle}
           customInstructions={customInstructions}
           setCustomInstructions={setCustomInstructions}
+          standardsYaml={standardsYaml}
+          setStandardsYaml={setStandardsYaml}
           samples={samples}
           isLoading={isLoading}
           onStartReview={handleStartReview}
@@ -273,6 +280,7 @@ export default function Home() {
                 findings={reviewResult.findings}
                 highlightFile={highlightFile}
                 highlightLine={highlightLine}
+                highlightSide={highlightSide}
               />
             )}
           </div>
@@ -298,3 +306,4 @@ export default function Home() {
     </div>
   );
 }
+

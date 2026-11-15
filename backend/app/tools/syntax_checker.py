@@ -7,6 +7,7 @@ import ast
 import re
 import textwrap
 from typing import Dict, List, Any
+from app.tools.security_scanner import redact_sensitive_line, sanitize_code_snippet
 
 
 def check_python_syntax(code_snippet: str, file_path: str = "") -> List[Dict[str, Any]]:
@@ -29,15 +30,25 @@ def check_python_syntax(code_snippet: str, file_path: str = "") -> List[Dict[str
         ast.parse(textwrap.dedent(full_code))
     except (SyntaxError, IndentationError) as e:
         msg = str(e.msg).lower() if hasattr(e, "msg") else ""
-        if any(kw in msg for kw in ("was never closed", "unmatched", "invalid character", "cannot assign to", "duplicate argument")):
+        if any(kw in msg for kw in ("was never closed", "unmatched", "invalid character", "cannot assign to", "duplicate argument", "unterminated")):
+            sanitized_full_code = sanitize_code_snippet(full_code)
+            sanitized_lines = sanitized_full_code.splitlines()
+            err_line_idx = (e.lineno - 1) if (e.lineno and 1 <= e.lineno <= len(sanitized_lines)) else None
+            if err_line_idx is not None:
+                sanitized_text = sanitized_lines[err_line_idx].strip()
+            else:
+                raw_text = e.text.strip() if e.text else ""
+                sanitized_text = redact_sensitive_line(raw_text)
+
+            sanitized_msg = redact_sensitive_line(str(e.msg))
             issues.append({
                 "tool": "syntax_checker",
                 "type": "SYNTAX_ERROR",
                 "severity": "HIGH",
                 "file_path": file_path,
                 "line_number": e.lineno or 1,
-                "message": f"Python Syntax Error: {e.msg}",
-                "text": e.text.strip() if e.text else ""
+                "message": f"Python Syntax Error: {sanitized_msg}",
+                "text": sanitized_text
             })
 
     # 2. Check for common regex logic issues (e.g., except Exception: pass, bare except)
@@ -50,7 +61,7 @@ def check_python_syntax(code_snippet: str, file_path: str = "") -> List[Dict[str
                 "file_path": file_path,
                 "line_number": idx,
                 "message": "Silencing exceptions with bare 'except:' or 'except Exception: pass' hides critical runtime failures.",
-                "text": line.strip()
+                "text": redact_sensitive_line(line.strip())
             })
 
     return issues
@@ -71,7 +82,7 @@ def check_javascript_syntax(code_snippet: str, file_path: str = "") -> List[Dict
                 "file_path": file_path,
                 "line_number": idx,
                 "message": "Use strict equality '===' instead of loose equality '==' to prevent unexpected type coercion.",
-                "text": line.strip()
+                "text": redact_sensitive_line(line.strip())
             })
         
         # Missing await on common async calls
@@ -84,7 +95,7 @@ def check_javascript_syntax(code_snippet: str, file_path: str = "") -> List[Dict
                     "file_path": file_path,
                     "line_number": idx,
                     "message": "Async function / Promise called without 'await' or promise chaining (.then). May cause race conditions or uncaught rejections.",
-                    "text": line.strip()
+                    "text": redact_sensitive_line(line.strip())
                 })
 
     return issues

@@ -13,6 +13,8 @@ import {
   Sparkles,
   HelpCircle,
   Lightbulb,
+  Bug,
+  Sliders,
 } from 'lucide-react';
 import { ReviewSummary, ReviewVerdict } from '@/types';
 
@@ -67,6 +69,10 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
   const verdict = getVerdictDetails(summary.verdict);
   const bySev = summary.by_severity || {};
   const byConf = summary.by_confidence || {};
+  const byType = summary.by_finding_type || {};
+  const totalDefects = summary.total_defects ?? (byType['code_defect'] || 0);
+  const totalPolicies = summary.total_policy_violations ?? (byType['policy_violation'] || 0);
+  const totalRecommendations = summary.total_recommendations ?? (byType['recommendation'] || 0);
 
   return (
     <div className="space-y-4 mb-6">
@@ -115,53 +121,59 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Total Issues */}
+        {/* Total Findings */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-3.5 flex flex-col justify-between">
           <span className="text-[11px] font-medium text-gray-400">Total Findings</span>
           <div className="text-2xl font-bold text-white mt-1">{summary.total_findings}</div>
           <span className="text-[10px] text-gray-500 mt-0.5">Across all categories</span>
         </div>
 
-        {/* Critical */}
-        <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-3.5 flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-red-400 flex items-center justify-between">
-            <span>Critical</span>
-            <span className="w-2 h-2 rounded-full bg-red-500" />
+        {/* Software Defects */}
+        <div className="bg-rose-950/20 border border-rose-900/30 rounded-xl p-3.5 flex flex-col justify-between">
+          <span className="text-[11px] font-medium text-rose-400 flex items-center justify-between">
+            <span>Defects</span>
+            <Bug className="w-3.5 h-3.5 text-rose-400" />
           </span>
-          <div className="text-2xl font-bold text-red-300 mt-1">{bySev['CRITICAL'] || 0}</div>
-          <span className="text-[10px] text-red-400/70 mt-0.5">Immediate blockers</span>
+          <div className="text-2xl font-bold text-rose-300 mt-1">{totalDefects}</div>
+          <span className="text-[10px] text-rose-400/70 mt-0.5">Bugs & vulnerabilities</span>
         </div>
 
-        {/* High */}
+        {/* Policy Violations */}
+        <div className="bg-purple-950/20 border border-purple-900/30 rounded-xl p-3.5 flex flex-col justify-between">
+          <span className="text-[11px] font-medium text-purple-400 flex items-center justify-between">
+            <span>Policy Violations</span>
+            <Sliders className="w-3.5 h-3.5 text-purple-400" />
+          </span>
+          <div className="text-2xl font-bold text-purple-300 mt-1">{totalPolicies}</div>
+          <span className="text-[10px] text-purple-400/70 mt-0.5">Repository standards</span>
+        </div>
+
+        {/* Critical & High Blockers */}
         <div className="bg-amber-950/20 border border-amber-900/30 rounded-xl p-3.5 flex flex-col justify-between">
           <span className="text-[11px] font-medium text-amber-400 flex items-center justify-between">
-            <span>High</span>
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <span>Blockers</span>
+            <span className="w-2 h-2 rounded-full bg-red-500" />
           </span>
-          <div className="text-2xl font-bold text-amber-300 mt-1">{bySev['HIGH'] || 0}</div>
-          <span className="text-[10px] text-amber-400/70 mt-0.5">Reliability/logic risks</span>
+          <div className="text-2xl font-bold text-amber-300 mt-1">
+            {(bySev['CRITICAL'] || 0) + (bySev['HIGH'] || 0)}
+          </div>
+          <span className="text-[10px] text-amber-400/70 mt-0.5">
+            {bySev['CRITICAL'] || 0} critical • {bySev['HIGH'] || 0} high
+          </span>
         </div>
 
-        {/* Medium */}
-        <div className="bg-yellow-950/20 border border-yellow-900/30 rounded-xl p-3.5 flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-yellow-400 flex items-center justify-between">
-            <span>Medium</span>
-            <span className="w-2 h-2 rounded-full bg-yellow-500" />
-          </span>
-          <div className="text-2xl font-bold text-yellow-300 mt-1">{bySev['MEDIUM'] || 0}</div>
-          <span className="text-[10px] text-yellow-400/70 mt-0.5">Quality & test gaps</span>
-        </div>
-
-        {/* Low & Info */}
+        {/* Medium & Low */}
         <div className="bg-blue-950/20 border border-blue-900/30 rounded-xl p-3.5 flex flex-col justify-between">
           <span className="text-[11px] font-medium text-blue-400 flex items-center justify-between">
-            <span>Low & Style</span>
+            <span>Quality & Style</span>
             <span className="w-2 h-2 rounded-full bg-blue-500" />
           </span>
           <div className="text-2xl font-bold text-blue-300 mt-1">
-            {(bySev['LOW'] || 0) + (bySev['INFO'] || 0)}
+            {(bySev['MEDIUM'] || 0) + (bySev['LOW'] || 0) + (bySev['INFO'] || 0)}
           </div>
-          <span className="text-[10px] text-blue-400/70 mt-0.5">Maintainability items</span>
+          <span className="text-[10px] text-blue-400/70 mt-0.5">
+            {bySev['MEDIUM'] || 0} med • {(bySev['LOW'] || 0) + (bySev['INFO'] || 0)} low
+          </span>
         </div>
 
         {/* Confirmed vs Potential Ratio */}
@@ -186,3 +198,4 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
     </div>
   );
 };
+

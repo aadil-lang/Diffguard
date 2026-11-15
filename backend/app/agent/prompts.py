@@ -23,6 +23,13 @@ Group findings into these precise categories:
 - CODE_QUALITY_AND_MAINTAINABILITY: High cyclomatic complexity, excessive nesting, duplication, tight coupling, poor naming, dead code.
 - STYLE_AND_CONSISTENCY: Anti-patterns, non-standard naming, loose equality, lack of type annotations where required.
 
+### CLASSIFICATION OF FINDINGS (DEFECTS VS POLICIES VS RECOMMENDATIONS)
+Distinguish clearly between finding types:
+- "code_defect": Definite or potential software bugs, security vulnerabilities, or runtime errors.
+- "policy_violation": Deviations from explicit repository engineering standards (.diffguard.yaml), such as function length, nesting limits, prohibited imports, or custom patterns.
+- "recommendation": Advisory suggestions for improvements or refactoring.
+NEVER classify a policy violation as a code defect merely because it violates a configured repository rule.
+
 ### SEVERITY CRITERIA
 - CRITICAL: Remote code execution, credential leak, data loss, SQL injection, fatal unhandled crash in core path.
 - HIGH: Serious logic bug, unauthorized access, broken async/concurrency, missing authentication, resource exhaustion.
@@ -30,9 +37,18 @@ Group findings into these precise categories:
 - LOW: Minor edge case, unidiomatic pattern, loose typing, non-critical style deviation.
 - INFO: Informational note, positive feedback on good practices, documentation tip.
 
+### ON-DEMAND INVESTIGATION TOOLS
+During the investigation phase, you have access to read-only diff inspection tools:
+- `inspect_diff_hunk`: inspects exact hunk lines, headers, additions, and deletions for a file in the patch.
+- `inspect_patch_context`: retrieves surrounding context lines present within the patch for specified lines.
+Use these tools when you need to inspect hunk bounds or verify lines within the patch.
+Do not assume whole-file contents exist beyond the submitted patch hunks.
+Stop calling tools and conclude your investigation when you have sufficient evidence.
+
 ### OUTPUT CONTRACT
 Return a clean, strictly compliant JSON object matching the requested schema. Ensure:
-- Every finding has a concrete, exact file_path and start_line referencing the new/modified code.
+- Every finding has a concrete, exact file_path and start_line referencing the affected code (or line_side="file_level" for file-wide issues like missing tests).
+- Specify line_side: "new" (for added lines), "old" (for deleted lines), "both" (for unchanged context lines), or "file_level".
 - "why_identified" provides the technical root-cause rationale.
 - "impact" explains the operational consequences if left unresolved.
 - "suggested_fix" includes a working, actionable code replacement.
@@ -43,12 +59,20 @@ def construct_agent_prompt(
     parsed_diff_summary: str,
     raw_diff: str,
     tool_evidence: str,
-    custom_instructions: str = ""
+    custom_instructions: str = "",
+    standards_summary: str = ""
 ) -> str:
-    """Build the contextual agent prompt with empirical tool evidence."""
+    """Build the contextual agent prompt with empirical tool evidence and active engineering standards."""
     prompt = f"""### CONTEXTUAL SUMMARY OF CHANGES
 {parsed_diff_summary}
+"""
+    if standards_summary and standards_summary.strip():
+        prompt += f"""
+### REPOSITORY ENGINEERING STANDARDS (.diffguard.yaml)
+{standards_summary.strip()}
+"""
 
+    prompt += f"""
 ### EMPIRICAL TOOL FINDINGS
 The following deterministic analysis tools (Security Scanner, Syntax Checker, Complexity Analyzer, Test Coverage Analyzer) were executed across the diff hunks:
 {tool_evidence}
@@ -65,7 +89,8 @@ The following deterministic analysis tools (Security Scanner, Syntax Checker, Co
 """
 
     prompt += """
-Perform the deep agentic review now. Evaluate both the empirical tool findings and semantic code logic. Synthesize deduplicated, high-precision findings according to the structured JSON schema.
+Perform the deep agentic review now. You have access to on-demand inspection tools ('inspect_diff_hunk', 'inspect_patch_context') to inspect specific hunks or line contexts in the submitted patch.
+Investigate potential regressions, security risks, or logical anomalies. When you have collected sufficient evidence, conclude your investigation to synthesize findings.
 """
     return prompt
 

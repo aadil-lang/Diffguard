@@ -1,262 +1,178 @@
 # DiffGuard — AI-Powered Git Diff & Pull Request Review Agent
 
-DiffGuard is an enterprise-grade, agentic code review system designed to analyze Git unified diffs and pull request patches. Unlike simple chatbots that merely regurgitate code, DiffGuard implements a multi-stage **AI agent workflow**: it decomposes diff hunks, invokes deterministic empirical analysis tools (security scanning, AST syntax validation, complexity metrics, test gap analysis), and synthesizes validated, structured review findings with actionable fixes.
+> **FLEXGCC AI Engineer Practical Assignment Submission**  
+> An autonomous agent that analyzes Git diffs and produces structured, actionable review feedback on potential bugs, security vulnerabilities, missing tests, and engineering standards compliance.
 
 ---
 
-## Architecture Overview
+## A. Project Overview
 
-```mermaid
-flowchart TD
-    UserDiff["Git Unified Diff / PR Patch"] --> Stage1["Stage 1: Ingestion & Boundary Check"]
-    Stage1 --> Stage2["Stage 2: Unidiff Parsing & Hunk Healing"]
-    
-    subgraph Tools ["Agent Static Analysis Tools"]
-        Stage2 --> ToolSec["Security Scanner (OWASP/CWE)"]
-        Stage2 --> ToolSyn["AST & Syntax Verifier"]
-        Stage2 --> ToolComp["Cyclomatic Complexity Analyzer"]
-        Stage2 --> ToolTest["Test Coverage & Churn Analyzer"]
-    end
-    
-    ToolSec & ToolSyn & ToolComp & ToolTest --> Stage3["Stage 3: Tool Findings Aggregation"]
-    Stage3 --> Stage4{"API Key Available?"}
-    
-    Stage4 -- Yes --> AgentGemini["Stage 4A: Gemini Agent Loop\n(Prompt Injection Defense + JSON Schema)"]
-    Stage4 -- No / Fail --> AgentFallback["Stage 4B: Deterministic Heuristic Engine\n(Offline Reliability Fallback)"]
-    
-    AgentGemini & AgentFallback --> Stage5["Stage 5: Pydantic Schema Validation"]
-    Stage5 --> ReviewResponse["Structured Review Output\n(Findings, Locations, Severity, Verdict, Fixes)"]
-    
-    ReviewResponse --> Frontend["Next.js Responsive Dashboard\n(Progress Stepper, Filterable Cards, Unified Diff Viewer)"]
-```
+Code reviews are a critical safeguard in software engineering, but human reviewers frequently miss subtle regressions, edge cases, and security vulnerabilities under time pressure. 
+
+**DiffGuard** is a specialized AI review agent designed to inspect Git unified diffs before code merges. Unlike generic conversational chatbots, DiffGuard operates as a structured, two-phase agent:
+1. **Investigation Phase**: Autonomously inspects code hunks and surrounding patch context using specialized tools while gathering deterministic static analysis signals.
+2. **Synthesis Phase**: Cross-references findings, checks against configurable engineering standards, validates line locations against actual diff hunks, and emits schema-validated review reports with actionable remediations.
+
+If external AI providers are unavailable, DiffGuard gracefully falls back to an internal deterministic heuristic engine, guaranteeing zero-failure availability.
 
 ---
 
-## Key Features
+## B. Functionality
 
-1. **True AI Agent Workflow**:
-   - **Empirical Tool Calling**: Deterministic tools execute on code hunks to extract empirical proof of bugs, vulnerabilities, and high complexity before AI synthesis.
-   - **Structured Schema Enforced**: Powered by Pydantic v2 and Gemini JSON Schema constraints (`ReviewResponse`, `Finding`, `ReviewSummary`).
-   - **Zero Failure Degradation**: Includes a deterministic heuristic engine that functions seamlessly even when the Gemini API is offline, unconfigured, or rate-limited.
-
-2. **Core Review Capabilities**:
-   - **Bugs & Logic Errors**: Off-by-one errors, missing awaits, unhandled promises, unhandled edge cases.
-   - **Security & Reliability**: SQL injection risks, hardcoded private keys/secrets, OS command injection, unclosed file/resource leaks.
-   - **Missing Test Coverage**: Flags modified production logic lacking corresponding unit or integration test updates.
-   - **Code Quality & Maintainability**: Evaluates cyclomatic complexity and nesting depth to highlight high cognitive load code.
-   - **Style & Consistency**: Flags dangerous bare excepts, loose equality, and non-idiomatic patterns.
-
-3. **Security & Prompt Injection Defense**:
-   - **Untrusted Input Isolation**: Code diffs are wrapped inside strict `<untrusted_git_diff>` boundaries with explicit agent instructions to reject prompt injection attempts embedded in code comments or strings.
-   - **Sandboxed Analysis**: Submitted code is analyzed statically and is **never executed**.
-
-4. **Modern Developer UI (Next.js + Tailwind CSS)**:
-   - **Preloaded Realistic Scenarios**: 5 bundled sample diffs (Critical SQLi, Async Logic Bug, Resource Leak, Untested Complexity, Clean PR).
-   - **Real-Time Stage Tracker**: Visual stepper with real-time SSE streaming of agent execution stages.
-   - **Interactive Filtering & Search**: Filter by Severity (Critical, High, Medium, Low, Info), Category, and Confidence (Confirmed, Potential, Suggestion).
-   - **Unified Diff Viewer**: Side-by-side / unified code viewer with line-level finding annotations.
-   - **One-Click Export**: Export comprehensive code review reports in GitHub-flavored Markdown.
+- **Resilient Diff Ingestion**: Parses multi-file, multi-hunk unified diffs with automated header healing for malformed patches.
+- **Structured Findings**: Emits standardized finding objects including file path, line number, diff side (`OLD`/`NEW`), severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO`), category, CWE classification, title, description, and copyable remediation code.
+- **Multi-Category Defect Detection**:
+  - *Security Risks*: SQL injection, hardcoded credentials, OS command injection, path traversal.
+  - *Syntax & Runtime Defects*: Python bare `except`, JavaScript loose equality (`==`), resource leaks, unhandled promises.
+  - *Code Maintainability*: Cyclomatic complexity spikes, deep nesting depth (>3 levels).
+  - *Missing Test Coverage*: AST-based test gap analysis flagging modified production logic lacking corresponding test additions.
+- **Agent Tool Calling**: The agent dynamically invokes specialized tools (`inspect_diff_hunk`, `inspect_patch_context`) within strict token and turn budgets to clarify changes before finalizing review findings.
+- **Configurable Engineering Standards**: Enforces repository-level policies (file size, function line length, naming conventions, docstrings, forbidden imports) via `standards.yaml`.
+- **Interactive Web Dashboard**: Built with Next.js 15 and Tailwind CSS, featuring side-by-side / unified diff viewing, side-aware finding badges, severity filtering, sample diff selection, and real-time SSE progress streaming.
+- **Deterministic Heuristic Fallback**: An offline analysis engine that generates immediate reviews when Gemini API keys are omitted or external services are unreachable.
 
 ---
 
-## Project Structure
+## C. Implementation Details
 
-```
-Diffguard/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   └── routes.py              # REST & SSE streaming endpoints (/api/review, /api/review/stream, /api/samples)
-│   │   ├── agent/
-│   │   │   ├── reviewer_agent.py      # Core agent orchestrator
-│   │   │   ├── prompts.py             # System instructions & prompt injection defenses
-│   │   │   └── fallback_engine.py     # Deterministic heuristic engine for 100% offline reliability
-│   │   ├── models/
-│   │   │   ├── schemas.py             # Pydantic domain models & response contracts
-│   │   │   └── diff_models.py         # Internal unidiff representations
-│   │   ├── parser/
-│   │   │   └── diff_parser.py         # Resilient git diff parser with automated header healing
-│   │   ├── samples/
-│   │   │   └── sample_diffs.py        # 5 curated realistic test scenarios
-│   │   ├── tools/
-│   │   │   ├── security_scanner.py    # OWASP/CWE pattern detector (SQLi, secrets, cmd injection)
-│   │   │   ├── syntax_checker.py      # AST & JS anomaly analyzer
-│   │   │   ├── complexity_analyzer.py # Cyclomatic complexity & nesting depth metric tool
-│   │   │   ├── test_requirement_analyzer.py # Production vs test churn validator
-│   │   │   └── tool_registry.py       # Tool execution dispatcher & Gemini tool schemas
-│   │   ├── config.py                  # Pydantic application settings
-│   │   └── main.py                    # FastAPI application entrypoint & CORS middleware
-│   ├── tests/                         # 26 Unit & Integration Tests (100% passing)
-│   │   ├── test_diff_parser.py
-│   │   ├── test_tools.py
-│   │   ├── test_agent_schema.py
-│   │   ├── test_api_routes.py
-│   │   └── test_security_adversarial.py
-│   ├── requirements.txt
-│   └── pytest.ini
-├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx               # Main review dashboard & state machine
-│   │   │   ├── layout.tsx             # Root layout with dark theme
-│   │   │   └── globals.css            # Tailwind utilities & custom diff highlights
-│   │   ├── components/
-│   │   │   ├── Navbar.tsx             # App header with model status and settings trigger
-│   │   │   ├── DiffInput.tsx          # Textarea editor, sample picker, and patch uploader
-│   │   │   ├── ProgressStages.tsx     # Live agent execution pipeline stepper
-│   │   │   ├── SummaryCards.tsx       # Verdict badge, key takeaways, and metric stats
-│   │   │   ├── FindingsList.tsx       # Filterable & searchable findings container
-│   │   │   ├── FindingCard.tsx        # Structured finding card with root cause, impact, & fix
-│   │   │   ├── DiffViewer.tsx         # Unified diff view with line annotations
-│   │   │   └── SettingsModal.tsx      # Browser-level Gemini API key & model configuration
-│   │   └── types/
-│   │       └── index.ts               # TypeScript interfaces matching backend models
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── tailwind.config.js
-├── README.md
-└── .env.example
-```
+DiffGuard is built with modern, production-grade frameworks:
+
+- **Backend Architecture**:
+  - **Framework**: FastAPI (>=0.115.0) on Python 3.12 with Uvicorn (>=0.30.0).
+  - **Data Contracts**: Pydantic v2 (>=2.8.0) and Pydantic-Settings (>=2.4.0) for strict type validation.
+  - **AI Integration**: Google GenAI SDK (`google-genai` >=1.0.0) targeting `gemini-2.5-flash` with function calling and structured response schemas.
+  - **Streaming**: Server-Sent Events via `sse-starlette` (>=2.1.0) streaming granular execution stages to the frontend.
+  - **Static Analysis**: `unidiff` (>=1.0.1) for diff parsing, Python `ast` for syntax/complexity inspection, and regular expression engines (`re`, `google-re2`).
+  - **Testing**: `pytest` (>=8.0.0) with **251 unit and regression tests** (100% pass rate).
+- **Frontend Architecture**:
+  - **Framework**: Next.js (15.1.0) with React (19.0.0) App Router.
+  - **Styling & UI**: Tailwind CSS (3.4.16) and Lucide React icons (0.469.0).
+  - **Testing**: Node.js built-in test runner with **8 frontend tests** (100% pass rate).
 
 ---
 
-## Quickstart Guide
+## D. What Went Wrong & How It Was Handled
+
+Developing an autonomous agent with external LLM boundaries revealed several real-world engineering hurdles:
+
+1. **Hallucinatory Finding Locations**:
+   - *Problem*: Early LLM evaluations occasionally emitted findings referencing non-existent line numbers or lines outside the modified diff hunks.
+   - *Solution*: Built a deterministic `location_validator.py` that cross-references all candidate findings against parsed diff hunk boundaries. Unmodified or out-of-bounds line numbers are clamped to the nearest hunk line or converted into file-level observations.
+2. **Duplicate & Conflicting Findings**:
+   - *Problem*: Both static tools and the LLM would flag the same issue with slightly different titles, causing redundant entries.
+   - *Solution*: Implemented canonical path normalization and side-aware finding deduplication (`OLD` line vs `NEW` line), merging static rule attributions into unified authoritative findings.
+3. **Agent Loop Budget Exhaustion**:
+   - *Problem*: Complex diffs risked triggering repeated tool invocations, threatening latency deadlines and API quotas.
+   - *Solution*: Enforced a 30-second monotonic deadline, a maximum of 3 investigation turns, a 10-call tool budget, and invocation caching in `ToolDispatcher`.
+4. **Secret Disclosure Across Boundaries**:
+   - *Problem*: Adversarial security audits revealed that raw credentials in diffs could pass into LLM prompts, AST parser exception strings (`SyntaxError.text`), or error logs.
+   - *Solution*: Implemented defense-in-depth sanitization: `sanitize_diff_content()` strips credentials prior to prompt construction, `ContainerScopeTracker` tracks multiline container secrets across diff lines, and AST snippet cleaners protect parser exceptions.
+5. **SQL f-String False Positive**:
+   - *Problem*: The query `raw_query = f"SELECT ... AND password = '{password_hash}'"` triggered false hardcoded secret findings because `password` appeared near quotes.
+   - *Solution*: Implemented `is_index_inside_quote()` to track character quote state up to the identifier, preventing strings inside SQL templates from matching secret assignment rules.
+6. **ES6 Backtick Delimiter Gap**:
+   - *Problem*: JavaScript backtick credentials (``const API_KEY = `secret`;``) escaped regex checks that only targeted single and double quotes.
+   - *Solution*: Unified delimiter patterns with `STRING_LITERAL` supporting single, double, and backtick quotes across all redactors and trackers.
+
+---
+
+## E. Future Improvements
+
+The following items are identified for future production expansion:
+
+- **VCS Platform Webhooks**: Direct GitHub Action and GitLab CI integrations to post comments directly on pull request threads.
+- **Multi-Language AST Engines**: Tree-sitter integration for deep syntax inspection across Go, Rust, Java, and C++.
+- **Expanded Real-World Evaluation**: Benchmarking agent recommendations against large-scale public pull request datasets.
+- **OpenTelemetry Instrumentation**: Distributed tracing for latency profiling across individual tool invocations and LLM turns.
+- **End-to-End Browser Automation**: Playwright integration suites for frontend regression testing.
+
+---
+
+## F. Running Locally
 
 ### Prerequisites
-- Python 3.12+
-- Node.js 18+ and npm
+- Python 3.10+ (tested on Python 3.12)
+- Node.js 18+ (tested on Node.js 22)
+- Optional: Google Gemini API key (for live AI mode)
 
 ### 1. Backend Setup
-
 ```bash
 cd backend
-
-# Create virtual environment (optional but recommended)
 python -m venv venv
-# Windows:
-.\venv\Scripts\activate
-# Linux/macOS:
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# (Optional) Set your Gemini API key in .env or environment
-# If unset, DiffGuard will seamlessly run its deterministic heuristic review engine
-set GEMINI_API_KEY=your_gemini_api_key
-
-# Run backend API server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend API will be running at `http://127.0.0.1:8000`.  
-Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
-
-### 2. Running Backend Tests
-
-```bash
-cd backend
-python -m pytest tests -v
-```
-
-All **26 unit, integration, and security adversarial tests** pass cleanly.
-
-### 3. Frontend Setup
-
+### 2. Frontend Setup
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
+```
 
-# Run Next.js development server
+### 3. Environment Configuration (Optional)
+DiffGuard runs completely offline via its deterministic fallback engine if no API key is provided. To enable live Gemini agent reasoning:
+```bash
+# In backend/.env or your terminal:
+export GEMINI_API_KEY="your-gemini-api-key"
+```
+
+### 4. Starting the Application
+
+**Option A — Automated Launcher (Windows):**
+```bash
+# In root directory:
+start.bat
+# Or using PowerShell:
+.\start.ps1
+```
+
+**Option B — Manual Launch:**
+```bash
+# Terminal 1 (Backend):
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Terminal 2 (Frontend):
+cd frontend
 npm run dev
 ```
 
-Open `http://localhost:3000` in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## API Reference
+## G. Running Test Suites
 
-### 1. `POST /api/review`
-Synchronous review endpoint that processes diff and returns complete structured response.
+```bash
+# Backend pytest suite (251 tests):
+python -m pytest backend/tests -v
 
-**Request:**
-```json
-{
-  "diff_content": "diff --git a/services/auth.py b/services/auth.py...",
-  "title": "Fix authentication query",
-  "custom_instructions": "Check for SQL injection and token leaks"
-}
+# Frontend test suite (8 tests):
+npm --prefix frontend test
 ```
 
-**Response:**
-```json
-{
-  "review_id": "rev_1710000000",
-  "timestamp": "2026-11-13T19:00:00Z",
-  "parsed_files_count": 1,
-  "total_additions": 10,
-  "total_deletions": 3,
-  "summary": {
-    "total_findings": 2,
-    "by_severity": { "CRITICAL": 1, "HIGH": 1 },
-    "verdict": "CRITICAL_BLOCKER",
-    "key_takeaways": ["Blocked by 1 Critical issue(s) that must be remediated immediately."]
-  },
-  "findings": [
-    {
-      "id": "DG-001",
-      "title": "SQL Injection Risk (CWE-89)",
-      "category": "SECURITY_AND_RELIABILITY",
-      "severity": "CRITICAL",
-      "confidence": "CONFIRMED_ISSUE",
-      "location": {
-        "file_path": "services/auth_service.py",
-        "start_line": 23,
-        "code_context": "raw_query = f\"SELECT * FROM users WHERE email = '{email}'\""
-      },
-      "why_identified": "SQL query constructed via f-string without parameterized binding.",
-      "impact": "Allows arbitrary SQL injection leading to total database compromise.",
-      "suggested_fix": {
-        "description": "Use parameterized queries.",
-        "replacement_code": "cursor.execute('SELECT * FROM users WHERE email = %s', (email,))"
-      },
-      "tool_evidence": ["Rule ID: SEC-SQLI-001", "CWE: CWE-89"]
-    }
-  ],
-  "stages_executed": [...],
-  "engine_used": "gemini-agent (gemini-2.5-flash)"
-}
+---
+
+## H. Production Deployment Commands
+
+### Backend Production Startup
+```bash
+cd backend
+# Set production environment variables
+export APP_ENV="production"
+export DEBUG="False"
+export CORS_ORIGINS="https://your-frontend-domain.com"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-### 2. `POST /api/review/stream`
-Server-Sent Events (SSE) streaming endpoint that yields real-time `stage_update` events as each processing phase begins and completes, terminating with the final `completed` review payload.
-
-### 3. `GET /api/samples`
-Returns bundled sample diff scenarios with descriptions and expected findings.
-
-### 4. `GET /api/health`
-Diagnostics endpoint reporting service status, active engine, and configuration.
-
----
-
-## Bundled Sample Scenarios
-
-| Sample ID | Title | Highlighted Risk | Expected Severity |
-| :--- | :--- | :--- | :--- |
-| `sample-sqli-auth` | Auth Service SQL Injection & Token Leak | Raw SQL formatting + Hardcoded JWT secret | **CRITICAL** |
-| `sample-logic-async-bug` | Payment Batch Loop & Missing Await | Off-by-one `range(len+1)` + Unawaited async call | **CRITICAL** |
-| `sample-resource-leak` | File Descriptor Leak & Bare Except | Naked `open()` assignment + `except Exception: pass` | **HIGH** |
-| `sample-untested-complexity` | Rebate Pricing Engine Without Tests | High cyclomatic complexity + 0 test changes | **HIGH** |
-| `sample-clean-pr` | Production-Ready Rate Limiter | Thread-safe, typed, with comprehensive unit tests | **APPROVED** |
-
----
-
-## Verification and Quality Standard
-
-- **Clean Architecture**: Separates models, parsing, static analysis tools, agent reasoning, and presentation.
-- **Fail-Safe Reliability**: When an external API or key is absent, DiffGuard falls back seamlessly to deterministic heuristics without interrupting user experience.
-- **Prompt Injection Defense**: Evaluated against adversarial prompt injections designed to manipulate verdicts.
-- **Type Safety**: Strictly enforced with Pydantic v2 in Python and TypeScript in Next.js.
+### Frontend Production Build & Startup
+```bash
+cd frontend
+export NEXT_PUBLIC_API_URL="https://api.your-backend-domain.com"
+npm run build
+npm run start
+```

@@ -9,6 +9,9 @@ from app.tools.security_scanner import scan_security_issues
 from app.tools.syntax_checker import run_syntax_and_linter_checks
 from app.tools.complexity_analyzer import analyze_complexity
 from app.tools.test_requirement_analyzer import analyze_test_coverage
+from app.tools.tool_declarations import get_gemini_tools
+from app.tools.tool_dispatcher import ToolDispatcher
+from app.tools.tool_schemas import ToolResult, InspectDiffHunkArgs, InspectPatchContextArgs
 
 
 # Gemini Function Declarations schemas

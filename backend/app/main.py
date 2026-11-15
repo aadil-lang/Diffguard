@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.api.routes import router as api_router
+from app.tools.security_scanner import redact_sensitive_line
 
 # Configure structured logging
 logging.basicConfig(
@@ -51,9 +52,10 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
+    safe_msg = redact_sensitive_line(str(exc)) if settings.DEBUG else "An internal server error occurred while processing the request."
     return JSONResponse(
         status_code=500,
-        content={"error": "InternalServerError", "message": str(exc)}
+        content={"error": "InternalServerError", "message": safe_msg}
     )
 
 # Mount routes under /api

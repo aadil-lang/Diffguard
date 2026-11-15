@@ -11,3 +11,4 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; pytho
 Write-Host "[2/2] Launching Frontend (Next.js) on port 3000..." -ForegroundColor Green
 cd frontend
 npm run dev
+

@@ -84,3 +84,4 @@ export const ProgressStages: React.FC<ProgressStagesProps> = ({ stages, isLoadin
     </div>
   );
 };
+

@@ -16,12 +16,16 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
+  Layers,
+  Sliders,
+  ShieldCheck,
 } from 'lucide-react';
-import { Finding, SeverityLevel, FindingCategory, FindingConfidence } from '@/types';
+import { Finding, SeverityLevel, FindingCategory, FindingConfidence, FindingType } from '@/types';
 
 interface FindingCardProps {
   finding: Finding;
-  onNavigateToFile?: (file: string, line: number) => void;
+  onNavigateToFile?: (file: string, line: number, lineSide?: string) => void;
 }
 
 export const FindingCard: React.FC<FindingCardProps> = ({ finding, onNavigateToFile }) => {
@@ -96,6 +100,66 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onNavigateToF
     }
   };
 
+  const getFindingTypeBadge = (type?: FindingType) => {
+    switch (type) {
+      case 'policy_violation':
+        return {
+          icon: <Sliders className="w-3 h-3 text-purple-400" />,
+          label: 'Policy Violation',
+          color: 'text-purple-300 bg-purple-950/50 border-purple-800/50',
+        };
+      case 'recommendation':
+        return {
+          icon: <Lightbulb className="w-3 h-3 text-teal-400" />,
+          label: 'Recommendation',
+          color: 'text-teal-300 bg-teal-950/50 border-teal-800/50',
+        };
+      case 'code_defect':
+      default:
+        return {
+          icon: <Bug className="w-3 h-3 text-rose-400" />,
+          label: 'Defect',
+          color: 'text-rose-300 bg-rose-950/50 border-rose-800/50',
+        };
+    }
+  };
+
+  const getLocationBadge = () => {
+    const status = finding.location.location_status || 'unverified';
+    const side = finding.location.line_side || 'new';
+
+    switch (status) {
+      case 'verified':
+        return {
+          icon: <CheckCircle2 className="w-3 h-3 text-emerald-400" />,
+          label: side === 'old' ? `Verified (Old L${finding.location.start_line})` : `Verified (L${finding.location.start_line})`,
+          color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40',
+          canNavigate: true,
+        };
+      case 'file_level':
+        return {
+          icon: <Layers className="w-3 h-3 text-purple-400" />,
+          label: 'File-Level Scope',
+          color: 'text-purple-300 bg-purple-950/40 border-purple-800/40',
+          canNavigate: true,
+        };
+      case 'unverified':
+        return {
+          icon: <HelpCircle className="w-3 h-3 text-amber-400" />,
+          label: `Unverified Line (L${finding.location.start_line})`,
+          color: 'text-amber-400 bg-amber-950/40 border-amber-800/40',
+          canNavigate: false,
+        };
+      case 'invalid':
+        return {
+          icon: <AlertCircle className="w-3 h-3 text-red-400" />,
+          label: 'Invalid Reference',
+          color: 'text-red-400 bg-red-950/40 border-red-800/40',
+          canNavigate: false,
+        };
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -103,13 +167,33 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onNavigateToF
   };
 
   const confBadge = getConfidenceBadge(finding.confidence);
+  const locBadge = getLocationBadge();
+  const typeBadge = getFindingTypeBadge(finding.finding_type);
 
   return (
     <div className="bg-gray-900/90 border border-gray-800 rounded-xl overflow-hidden shadow-lg transition-all hover:border-gray-700">
       {/* Finding Header */}
       <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-850/60 border-b border-gray-800/80">
-        <div className="flex items-start sm:items-center space-x-2.5 flex-wrap gap-y-1.5">
+        <div className="flex items-start sm:items-center space-x-2 flex-wrap gap-y-1.5">
           <span className="font-mono text-xs text-gray-400 font-semibold">{finding.id}</span>
+
+          {/* Finding Type Pill (Defect vs Policy Violation vs Recommendation) */}
+          <span
+            className={`flex items-center space-x-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ${typeBadge.color}`}
+          >
+            {typeBadge.icon}
+            <span>{typeBadge.label}</span>
+          </span>
+
+          {/* Rule ID Tag for Policy Violations */}
+          {finding.rule_id && (
+            <span
+              className="text-[10px] font-mono font-semibold text-purple-300 bg-purple-950/70 border border-purple-700/60 px-2 py-0.5 rounded-md"
+              title={finding.rule_name ? `Rule: ${finding.rule_name}` : `Rule ID: ${finding.rule_id}`}
+            >
+              [{finding.rule_id}]
+            </span>
+          )}
 
           <span
             className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getSeverityBadge(
@@ -130,19 +214,48 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onNavigateToF
             {confBadge.icon}
             <span>{confBadge.label}</span>
           </span>
+
+          {/* Location Verification Status Pill */}
+          <span
+            className={`flex items-center space-x-1 text-[10px] font-mono px-2 py-0.5 rounded-md border ${locBadge.color}`}
+            title={finding.location.validation_note || 'Location status'}
+          >
+            {locBadge.icon}
+            <span>{locBadge.label}</span>
+          </span>
         </div>
 
         {/* File and Line Anchor */}
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => onNavigateToFile?.(finding.location.file_path, finding.location.start_line)}
-            className="flex items-center space-x-1 text-xs font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-950/30 border border-indigo-800/40 px-2.5 py-1 rounded-md transition-colors"
-          >
-            <FileCode className="w-3.5 h-3.5" />
-            <span>
-              {finding.location.file_path}:{finding.location.start_line}
+          {locBadge.canNavigate ? (
+            <button
+              onClick={() =>
+                onNavigateToFile?.(
+                  finding.location.file_path,
+                  finding.location.start_line,
+                  finding.location.line_side || 'new'
+                )
+              }
+              className="flex items-center space-x-1 text-xs font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-950/30 border border-indigo-800/40 px-2.5 py-1 rounded-md transition-colors"
+              title="Navigate to diff location"
+            >
+              <FileCode className="w-3.5 h-3.5" />
+              <span>
+                {finding.location.file_path}
+                {finding.location.location_status !== 'file_level' && `:${finding.location.start_line}`}
+              </span>
+            </button>
+          ) : (
+            <span
+              className="flex items-center space-x-1 text-xs font-mono text-gray-500 bg-gray-950/40 border border-gray-800 px-2.5 py-1 rounded-md cursor-not-allowed"
+              title={finding.location.validation_note || 'Location could not be verified against the patch'}
+            >
+              <FileCode className="w-3.5 h-3.5 text-gray-600" />
+              <span>
+                {finding.location.file_path}:{finding.location.start_line}
+              </span>
             </span>
-          </button>
+          )}
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
@@ -158,6 +271,34 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onNavigateToF
         <div className="p-4 space-y-3.5">
           {/* Finding Title */}
           <h3 className="text-sm font-semibold text-white leading-snug">{finding.title}</h3>
+
+          {/* Policy Context Banner if Policy Violation */}
+          {finding.finding_type === 'policy_violation' && (finding.rule_id || finding.rule_name || finding.policy_category) && (
+            <div className="bg-purple-950/20 border border-purple-800/40 rounded-lg p-2.5 text-xs text-purple-300 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>
+                  <strong>Standard Enforced:</strong> {finding.rule_name || finding.rule_id}
+                  {finding.policy_category && <span className="text-purple-400/80"> • Policy: {finding.policy_category}</span>}
+                </span>
+              </div>
+              {finding.policy_evaluation_status && (
+                <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 bg-purple-900/50 rounded border border-purple-700/50 text-purple-200">
+                  {finding.policy_evaluation_status}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Validation Note if not fully verified */}
+          {finding.location.location_status && finding.location.location_status !== 'verified' && (
+            <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg p-2 text-xs text-amber-300 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Location Integrity Notice:</strong> {finding.location.validation_note || 'Location could not be verified against the submitted diff.'}
+              </span>
+            </div>
+          )}
 
           {/* Code Context if present */}
           {finding.location.code_context && (
