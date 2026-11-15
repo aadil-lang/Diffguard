@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     
     # Gemini API settings
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.8-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     GEMINI_REQUEST_TIMEOUT_MS: int = 25_000  # 25s upstream timeout in milliseconds (google-genai HttpOptions unit)
     INVESTIGATION_DEADLINE_SECONDS: float = 60.0  # 60s total investigation budget
     

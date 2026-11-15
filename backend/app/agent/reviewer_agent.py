@@ -87,6 +87,26 @@ def sanitize_provider_error(exc: Exception) -> str:
     return "AI provider request failed. Reverting to fallback review engine."
 
 
+def get_clean_developer_api_schema(pydantic_cls) -> dict:
+    """
+    Constructs a clean JSON schema dictionary from a Pydantic model for Google GenAI Developer API.
+    Strips `additionalProperties` which Developer API mode rejects (supported only in Enterprise mode).
+    """
+    schema = pydantic_cls.model_json_schema()
+
+    def _strip(d):
+        if isinstance(d, dict):
+            d.pop("additionalProperties", None)
+            for v in d.values():
+                _strip(v)
+        elif isinstance(d, list):
+            for item in d:
+                _strip(item)
+
+    _strip(schema)
+    return schema
+
+
 def are_line_sides_compatible(
     side1: Optional[LineSide],
     side2: Optional[LineSide]
@@ -523,7 +543,7 @@ class ReviewAgent:
                         system_instruction=DIFFGUARD_SYSTEM_INSTRUCTION,
                         temperature=0.2,
                         response_mime_type="application/json",
-                        response_schema=ReviewResponse,
+                        response_schema=get_clean_developer_api_schema(ReviewResponse),
                         tools=None,  # Explicitly disable tools for structured synthesis
                         http_options=types.HttpOptions(timeout=synth_timeout_ms)
                     )

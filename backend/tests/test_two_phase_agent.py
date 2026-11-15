@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 from google.genai import types
 
-from app.agent.reviewer_agent import ReviewAgent, CancellationToken, ReviewCancelledException
+from app.agent.reviewer_agent import ReviewAgent, CancellationToken, ReviewCancelledException, get_clean_developer_api_schema
 from app.models.schemas import ReviewRequest, ReviewResponse, ProcessingStage, StageStatus, FindingCategory, SeverityLevel
 from app.samples.sample_diffs import SAMPLE_SQLI_AUTH, SAMPLE_CLEAN_PR
 
@@ -98,7 +98,7 @@ def test_sdk_protocol_conversation_history_and_roles():
     call_3_args, call_3_kwargs = mock_client.models.generate_content.call_args_list[2]
     config_3 = call_3_kwargs["config"]
     assert config_3.tools is None
-    assert config_3.response_schema == ReviewResponse
+    assert config_3.response_schema in (ReviewResponse, get_clean_developer_api_schema(ReviewResponse))
     assert "tool call(s)" in res.engine_used
 
 

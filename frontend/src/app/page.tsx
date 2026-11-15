@@ -31,7 +31,7 @@ export default function Home() {
   // Settings state (apiKey is strictly kept in-memory for session security)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash-lite');
   const [useStreaming, setUseStreaming] = useState(true);
 
   // Load samples and UI preferences on mount
@@ -39,7 +39,7 @@ export default function Home() {
     // Purge any legacy API key from localStorage
     localStorage.removeItem('diffguard_api_key');
 
-    const savedModel = localStorage.getItem('diffguard_model') || 'gemini-3.8-flash';
+    const savedModel = localStorage.getItem('diffguard_model') || 'gemini-3.5-flash-lite';
     const savedStream = localStorage.getItem('diffguard_stream') !== 'false';
     setSelectedModel(savedModel);
     setUseStreaming(savedStream);

@@ -136,8 +136,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) => setTempModel(e.target.value)}
               className="w-full text-xs bg-gray-950 border border-gray-800 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest: Fast & Accurate)</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recommended: Fast & Verified Live)</option>
               <option value="gemini-3.5-flash">Gemini 3.5 Flash (Verified Responsive)</option>
+              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
               <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning)</option>
             </select>
