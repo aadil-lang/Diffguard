@@ -619,6 +619,8 @@ class ReviewAgent:
 
         # Recalculate summary metrics distinguishing defects from policy violations
         by_type: Dict[str, int] = {t.value: 0 for t in FindingType}
+        by_sev: Dict[str, int] = {s.value: 0 for s in SeverityLevel}
+        by_conf: Dict[str, int] = {c.value: 0 for c in FindingConfidence}
         total_defects = 0
         total_policy_violations = 0
         total_recommendations = 0
@@ -633,11 +635,29 @@ class ReviewAgent:
             else:
                 total_defects += 1
 
+            sev_str = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+            by_sev[sev_str] = by_sev.get(sev_str, 0) + 1
+
+            conf_str = f.confidence.value if hasattr(f.confidence, "value") else str(f.confidence)
+            by_conf[conf_str] = by_conf.get(conf_str, 0) + 1
+
         ai_review_response.summary.total_defects = total_defects
         ai_review_response.summary.total_policy_violations = total_policy_violations
         ai_review_response.summary.total_recommendations = total_recommendations
         ai_review_response.summary.by_finding_type = by_type
+        ai_review_response.summary.by_severity = by_sev
+        ai_review_response.summary.by_confidence = by_conf
         ai_review_response.summary.total_findings = len(ai_review_response.findings)
+
+        # Deterministic verdict calculation to guarantee safety & compliance
+        if by_sev.get("CRITICAL", 0) > 0:
+            ai_review_response.summary.verdict = "CRITICAL_BLOCKER"
+        elif by_sev.get("HIGH", 0) > 0:
+            ai_review_response.summary.verdict = "CHANGES_REQUESTED"
+        elif len(ai_review_response.findings) > 0:
+            ai_review_response.summary.verdict = "APPROVED_WITH_COMMENTS"
+        else:
+            ai_review_response.summary.verdict = "APPROVED"
 
         # Ensure correct file counts and stages
         ai_review_response.parsed_files_count = parsed_diff.total_files
