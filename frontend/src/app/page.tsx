@@ -11,10 +11,19 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { ReviewResponse, ProcessingStage, SampleDiff, StageStatus } from '@/types';
 import { AlertCircle, Code, ShieldCheck, Sparkles, Layers } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app'))
-    ? 'https://diffguard.onrender.com'
-    : 'http://127.0.0.1:8000');
+const getApiBaseUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://127.0.0.1:8000';
+    }
+  }
+  // Default to cloud backend for all deployed environments (Vercel, Netlify, etc.)
+  return 'https://diffguard.onrender.com';
+};
 
 export default function Home() {
   const [diffContent, setDiffContent] = useState<string>('');
@@ -48,7 +57,7 @@ export default function Home() {
     setUseStreaming(savedStream);
 
     // Fetch sample diffs from backend
-    fetch(`${API_BASE_URL}/api/samples`)
+    fetch(`${getApiBaseUrl()}/api/samples`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load samples');
         return res.json();
@@ -101,7 +110,7 @@ export default function Home() {
 
     if (useStreaming) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/review/stream`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/review/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -179,7 +188,7 @@ export default function Home() {
     } else {
       // Synchronous review fallback
       try {
-        const res = await fetch(`${API_BASE_URL}/api/review`, {
+        const res = await fetch(`${getApiBaseUrl()}/api/review`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
