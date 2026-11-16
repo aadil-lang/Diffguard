@@ -11,7 +11,10 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { ReviewResponse, ProcessingStage, SampleDiff, StageStatus } from '@/types';
 import { AlertCircle, Code, ShieldCheck, Sparkles, Layers } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app'))
+    ? 'https://diffguard.onrender.com'
+    : 'http://127.0.0.1:8000');
 
 export default function Home() {
   const [diffContent, setDiffContent] = useState<string>('');
