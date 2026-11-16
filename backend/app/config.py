@@ -41,6 +41,7 @@ class Settings(BaseSettings):
         default_factory=list,
         validation_alias=AliasChoices("CORS_ORIGINS", "DIFFGUARD_CORS_ORIGINS")
     )
+    CORS_ORIGIN_REGEX: str = r"^https://.*\.vercel\.app$|^https://.*\.netlify\.app$"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
