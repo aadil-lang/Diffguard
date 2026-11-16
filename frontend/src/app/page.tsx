@@ -164,7 +164,7 @@ export default function Home() {
           }
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
+          const lines = buffer.split(/\r?\n\r?\n/);
           buffer = lines.pop() || '';
 
           for (const block of lines) {
