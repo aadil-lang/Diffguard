@@ -118,48 +118,57 @@ export default function Home() {
         const decoder = new TextDecoder();
         let buffer = '';
 
+        const processBlock = (block: string) => {
+          if (!block.trim()) return;
+          const eventMatch = block.match(/^event:\s*(\w+)/m);
+          const eventType = eventMatch ? eventMatch[1] : 'message';
+          const dataIdx = block.indexOf('data:');
+          if (dataIdx === -1) return;
+          const rawData = block.slice(dataIdx + 5).trim();
+
+          try {
+            const data = JSON.parse(rawData);
+
+            if (eventType === 'stage_update') {
+              const stage = data as ProcessingStage;
+              setStages((prev) => {
+                const idx = prev.findIndex((s) => s.stage_id === stage.stage_id);
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = stage;
+                  return next;
+                }
+                return [...prev, stage];
+              });
+            } else if (eventType === 'completed') {
+              const result = data as ReviewResponse;
+              setReviewResult(result);
+              setStages(result.stages_executed || []);
+              setIsLoading(false);
+            } else if (eventType === 'error') {
+              setErrorMessage(data.message || 'Error occurred during review processing.');
+              setIsLoading(false);
+            }
+          } catch (jsonErr) {
+            console.error('Failed to parse SSE event data:', jsonErr, rawData);
+          }
+        };
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            if (buffer.trim()) {
+              processBlock(buffer.trim());
+            }
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n\n');
           buffer = lines.pop() || '';
 
           for (const block of lines) {
-            const eventMatch = block.match(/^event:\s*(\w+)/m);
-            const dataMatch = block.match(/^data:\s*(.+)$/m);
-            if (!dataMatch) continue;
-
-            const eventType = eventMatch ? eventMatch[1] : 'message';
-            const rawData = dataMatch[1];
-
-            try {
-              const data = JSON.parse(rawData);
-
-              if (eventType === 'stage_update') {
-                const stage = data as ProcessingStage;
-                setStages((prev) => {
-                  const idx = prev.findIndex((s) => s.stage_id === stage.stage_id);
-                  if (idx >= 0) {
-                    const next = [...prev];
-                    next[idx] = stage;
-                    return next;
-                  }
-                  return [...prev, stage];
-                });
-              } else if (eventType === 'completed') {
-                const result = data as ReviewResponse;
-                setReviewResult(result);
-                setStages(result.stages_executed || []);
-                setIsLoading(false);
-              } else if (eventType === 'error') {
-                setErrorMessage(data.message || 'Error occurred during review processing.');
-                setIsLoading(false);
-              }
-            } catch (jsonErr) {
-              console.error('Failed to parse SSE event data:', jsonErr, rawData);
-            }
+            processBlock(block);
           }
         }
       } catch (err: any) {

@@ -127,7 +127,7 @@ async def stream_review_diff(request: ReviewRequest):
 
     def stage_callback(stage: ProcessingStage):
         if not cancellation_token.is_cancelled:
-            queue.put_nowait({"type": "stage_update", "data": stage.model_dump()})
+            queue.put_nowait({"type": "stage_update", "data": stage.model_dump(mode="json")})
 
     async def run_review():
         try:
@@ -145,7 +145,7 @@ async def stream_review_diff(request: ReviewRequest):
                 cancellation_token
             )
             if not cancellation_token.is_cancelled:
-                await queue.put({"type": "completed", "data": result.model_dump()})
+                await queue.put({"type": "completed", "data": result.model_dump(mode="json")})
         except (ReviewCancelledException, asyncio.CancelledError):
             logger.info("Streaming review execution halted via cancellation.")
         except ValueError as val_err:
